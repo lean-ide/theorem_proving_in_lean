@@ -1,0 +1,1468 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2017-02-02 Thu 16:09 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Theorem Proving in Lean</title>
+<meta name="generator" content="Org mode" />
+<meta name="author" content="[[http://www.andrew.cmu.edu/user/avigad][Jeremy Avigad]]Jeremy Avigad, [[http://leodemoura.github.io][Leonardo de Moura]]Leonardo de Moura, [[http://www.cs.cmu.edu/~soonhok][Soonho Kong]]Soonho Kong" />
+<link rel="stylesheet" href="css/tutorial.css"/>
+<link rel="stylesheet" href="css/code.css"/>
+<script type="text/javascript" charset="utf-8">if(!window.PolymerGestures) { var head = document.getElementsByTagName('head')[0]; var js = document.createElement("script"); js.type = "text/javascript"; js.src = "//cdn.jsdelivr.net/webcomponentsjs/0.7.20/webcomponents.min.js"; head.appendChild(js); } </script>
+<link rel='import' href='juicy-ace-editor.html'/>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Theorem Proving in Lean</h1>
+
+<div id="outline-container-orgc8e555e" class="outline-2">
+<h2 id="Type_Classes"><a id="orgc8e555e"></a><span class="section-number-2"> 10</span> Type Classes</h2>
+<div class="outline-text-2" id="text-Type_Classes">
+<p>
+We have seen that Lean's elaborator provides helpful automation,
+filling in information that is tedious to enter by hand. In this
+section we will explore a simple but powerful technical device known
+as <i>type class inference</i>, which provides yet another mechanism for
+the elaborator to supply missing information.
+</p>
+
+<p>
+The notion of a <i>type class</i> originated with the <i>Haskell</i> programming
+language. Many of the original uses carry over, but, as we will see,
+the realm of interactive theorem proving raises even more
+possibilities for their use.
+</p>
+</div>
+
+<div id="outline-container-org5acfa63" class="outline-3">
+<h3 id="org5acfa63"><span class="section-number-3"> 10.1</span> Type Classes and Instances</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+Any family of types can be marked as a <i>type class</i>.
+Then we can declare particular elements of a type class to be
+<i>instances</i>. These provide hints to the elaborator: any time the
+elaborator is looking for an element of a type class, it can consult a
+table of declared instances to find a suitable element.
+</p>
+
+<p>
+More precisely, there are three steps involved:
+</p>
+<ul class="org-ul">
+<li>First, we declare a family of inductive types to be a type class.</li>
+<li>Second, we declare instances of the type class.</li>
+<li>Finally, we mark some implicit arguments with square brackets
+instead of curly brackets, to inform the elaborator that these
+arguments should be inferred by the type class mechanism.</li>
+</ul>
+
+<p>
+Here is a somewhat frivolous example:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-1' mode="ace/mode/lean" readonly="true">attribute [class] nat
+
+instance nat_one : ℕ := 1
+/- The command instance is syntax sugar for
+def nat_one : ℕ := 1
+attribute [instance, reducible] nat_one
+-/
+
+def foo [x : ℕ] : nat := x
+
+check @foo
+eval foo
+
+example : foo = 1 := rfl
+</juicy-ace-editor><div id='lean-full-code-1' style='display:none'>attribute [class] nat
+
+instance nat_one : ℕ := 1
+/- The command instance is syntax sugar for
+def nat_one : ℕ := 1
+attribute [instance, reducible] nat_one
+-/
+
+def foo [x : ℕ] : nat := x
+
+check @foo
+eval foo
+
+example : foo = 1 := rfl
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-1').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Here we declare <code>nat</code> to be a class with a "canonical" instance
+<code>1</code>. Then we declare <code>foo</code> to be, essentially, the identity function
+on the natural numbers, but we mark the argument implicit, and
+indicate that it should be inferred by type class inference. When we write
+<code>foo</code>, the preprocessor interprets it as <code>foo ?x</code>, where <code>?x</code> is an
+implicit argument. But when the elaborator gets hold of the
+expression, it sees that <code>?x : ℕ</code> is supposed to be solved by type
+class inference. It looks for a suitable element of the class, and it
+finds the instance <code>one</code>. Thus, when we evaluate <code>foo</code>, we
+simply get <code>1</code>.
+</p>
+
+
+<p>
+It is tempting to think of <code>foo</code> as defined to be equal to <code>1</code>, but
+that is misleading. Every time we write <code>foo</code>, the elaborator searches
+for a value. If we declare other instances of the class, that can
+change the value that is assigned to the implicit argument. This can
+result in seemingly paradoxical behavior. For example, we might
+continue the development above as follows:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-2' mode="ace/mode/lean" readonly="true">instance nat_two : ℕ := 2
+
+eval foo
+
+example : foo ≠ 1 :=
+λ h : 2 = 1, nat.no_confusion h (λ h : 1 = 0, nat.no_confusion h)</juicy-ace-editor><div id='lean-full-code-2' style='display:none'>attribute [class] nat
+
+instance nat_one : ℕ := 1
+
+def foo [x : ℕ] : nat := x
+
+eval foo
+
+example : foo = 1 := rfl
+
+instance nat_two : ℕ := 2
+
+eval foo
+
+example : foo ≠ 1 :=
+λ h : 2 = 1, nat.no_confusion h (λ h : 1 = 0, nat.no_confusion h)
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-2').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Now the "same" expression <code>foo</code> evaluates to <code>2</code>. Whereas before we
+could prove <code>foo = 1</code>, now we can prove <code>foo ≠ 1</code>, because the
+inferred implicit argument has changed. When searching for a suitable
+instance of a type class, the elaborator tries the most recent
+instance declaration first, by default. We will see below, however,
+that it is possible to give individual instances higher or lower
+priority.
+</p>
+
+<p>
+As with other attributes, you can assign the <code>class</code> or
+<code>instance</code> attributes in a definition, or after the fact, with an
+<code>attribute</code> command. As usual, the assignments <code>attribute [class] foo</code>
+and <code>attribute [instance] foo</code>.
+To limit the scope of an assignment to the current file,
+use the <code>local attribute</code> variant.
+</p>
+
+<p>
+The reason the example is frivolous is that there is rarely a need to
+"infer" a natural number; we can just hard-code the choice of <code>1</code> or
+<code>2</code> into the definition of <code>foo</code>. Type classes become useful when
+they depend on parameters, in which case, the value that is inferred
+depends on these parameters.
+</p>
+
+<p>
+Let us work through a simple example. Many theorems hold under the
+additional assumption that a type is inhabited, which is to say, it
+has at least one element. For example, if <code>α</code> is a type, <code>∃ x : α, x =
+x</code> is true only if <code>α</code> is inhabited. Similarly, it often happens that
+we would like a definition to return a default element in a "corner
+case." For example, we would like the expression <code>head l</code> to be of
+type <code>α</code> when <code>l</code> is of type <code>list α</code>; but then we are faced with the
+problem that <code>head l</code> needs to return an "arbitrary" element of <code>α</code> in
+the case where <code>l</code> is the empty list, <code>nil</code>.
+</p>
+
+<p>
+For purposes like this, the standard library defines a type class
+<code>inhabited : Type → Type</code>, to enable type class inference to infer a
+"default" or "arbitrary" element of an inhabited type. We will carry
+out a similar development in the examples that follow, using a
+namespace <code>hide</code> to avoid conflicting with the definitions in the
+standard library.
+</p>
+
+<p>
+Let us start with the first step of the program above, declaring an
+appropriate class:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-3' mode="ace/mode/lean" readonly="true">class inhabited (α : Type) :=
+(value : α)
+/- The command 'class' above is shorthand for
+
+@[class] structure inhabited (α : Type) :=
+(value : α)
+-/</juicy-ace-editor><div id='lean-full-code-3' style='display:none'>namespace hide
+
+class inhabited (α : Type) :=
+(value : α)
+/- The command 'class' above is shorthand for
+
+@[class] structure inhabited (α : Type) :=
+(value : α)
+-/
+
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-3').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+An element of the class <code>inhabited α</code> is simply an expression of the
+form <code>inhabited.mk a</code>, for some element <code>a : α</code>.
+The projection <code>inhabited.value</code> will allow us to "extract" such an element of <code>α</code>
+from an element of <code>inhabited α</code>.
+</p>
+
+<p>
+The second step of the program is to populate the class with some
+instances:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-4' mode="ace/mode/lean" readonly="true">instance Prop_inhabited : inhabited Prop :=
+inhabited.mk true
+
+instance bool_inhabited : inhabited bool :=
+inhabited.mk tt
+
+instance nat_inhabited : inhabited nat :=
+inhabited.mk 0
+
+instance unit_inhabited : inhabited unit :=
+inhabited.mk ()</juicy-ace-editor><div id='lean-full-code-4' style='display:none'>namespace hide
+
+class inhabited (α : Type) :=
+(value : α)
+
+instance Prop_inhabited : inhabited Prop :=
+inhabited.mk true
+
+instance bool_inhabited : inhabited bool :=
+inhabited.mk tt
+
+instance nat_inhabited : inhabited nat :=
+inhabited.mk 0
+
+instance unit_inhabited : inhabited unit :=
+inhabited.mk ()
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-4').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+In the Lean standard library, we regularly use the anonymous constructor
+when defining instances. It is particularly useful when the class name is long.
+</p>
+
+
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-5' mode="ace/mode/lean" readonly="true">instance Prop_inhabited : inhabited Prop :=
+⟨true⟩
+
+instance bool_inhabited : inhabited bool :=
+⟨tt⟩
+
+instance nat_inhabited : inhabited nat :=
+⟨0⟩
+
+instance unit_inhabited : inhabited unit :=
+⟨()⟩</juicy-ace-editor><div id='lean-full-code-5' style='display:none'>namespace hide
+
+class inhabited (α : Type) :=
+(value : α)
+
+instance Prop_inhabited : inhabited Prop :=
+⟨true⟩
+
+instance bool_inhabited : inhabited bool :=
+⟨tt⟩
+
+instance nat_inhabited : inhabited nat :=
+⟨0⟩
+
+instance unit_inhabited : inhabited unit :=
+⟨()⟩
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-5').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+This arranges things so that when type class inference is asked to
+infer an element <code>?M : Prop</code>, it can find the element <code>true</code> to assign
+to <code>?M</code>, and similarly for the elements <code>tt</code>, <code>0</code>, and <code>()</code> of
+the types <code>bool</code>, <code>nat</code>, and <code>unit</code>, respectively.
+</p>
+
+<p>
+The final step of the program is to define a function that infers an
+element <code>s : inhabited α</code> and puts it to good use. The following
+function simply extracts the corresponding element <code>a : α</code>:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-6' mode="ace/mode/lean" readonly="true">definition default (α : Type) [s : inhabited α] : α :=
+@inhabited.value α s</juicy-ace-editor><div id='lean-full-code-6' style='display:none'>namespace hide
+
+class inhabited (α : Type) :=
+(value : α)
+
+instance Prop_inhabited : inhabited Prop :=
+⟨true⟩
+
+instance bool_inhabited : inhabited bool :=
+⟨tt⟩
+
+instance nat_inhabited : inhabited nat :=
+⟨0⟩
+
+instance unit_inhabited : inhabited unit :=
+⟨()⟩
+definition default (α : Type) [s : inhabited α] : α :=
+@inhabited.value α s
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-6').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+This has the effect that given a type expression <code>α</code>, whenever we
+write <code>default α</code>, we are really writing <code>default α ?s</code>, leaving the
+elaborator to find a suitable value for the metavariable
+<code>?s</code>. When the elaborator succeeds in finding such a value, it has
+effectively produced an element of type <code>α</code>, as though by magic.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-7' mode="ace/mode/lean" readonly="true">check default Prop    -- Prop
+check default nat     -- ℕ
+check default bool    -- bool
+check default unit    -- unit</juicy-ace-editor><div id='lean-full-code-7' style='display:none'>namespace hide
+
+class inhabited (α : Type) :=
+(value : α)
+
+instance Prop_inhabited : inhabited Prop :=
+⟨true⟩
+
+instance bool_inhabited : inhabited bool :=
+⟨tt⟩
+
+instance nat_inhabited : inhabited nat :=
+⟨0⟩
+
+instance unit_inhabited : inhabited unit :=
+⟨()⟩
+
+def default (α : Type) [s : inhabited α] : α :=
+@inhabited.value α s
+check default Prop    -- Prop
+check default nat     -- ℕ
+check default bool    -- bool
+check default unit    -- unit
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-7').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+In general, whenever we write <code>default α</code>, we are asking the
+elaborator to synthesize an element of type <code>α</code>.
+</p>
+
+<p>
+Notice that we can "see" the value that is synthesized with <code>eval</code>:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-8' mode="ace/mode/lean" readonly="true">eval default Prop    -- true
+eval default nat     -- 0
+eval default bool    -- tt
+eval default unit    -- ()</juicy-ace-editor><div id='lean-full-code-8' style='display:none'>namespace hide
+
+class inhabited (α : Type) :=
+(value : α)
+
+instance Prop_inhabited : inhabited Prop :=
+⟨true⟩
+
+instance bool_inhabited : inhabited bool :=
+⟨tt⟩
+
+instance nat_inhabited : inhabited nat :=
+⟨0⟩
+
+instance unit_inhabited : inhabited unit :=
+⟨()⟩
+
+def default (α : Type) [s : inhabited α] : α :=
+@inhabited.value α s
+eval default Prop    -- true
+eval default nat     -- 0
+eval default bool    -- tt
+eval default unit    -- ()
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-8').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+Sometimes we want to think of the default element of a type as being
+an <i>arbitrary</i> element, whose specific value should not play a role in
+our proofs. For that purpose, we can write <code>arbitrary α</code> instead of
+<code>default α</code>. The definition of <code>arbitrary</code> is the same as that of
+default, but is marked <code>irreducible</code> to discourage the elaborator from
+unfolding it. This does not preclude proofs from making use of the
+value, however, so the use of <code>arbitrary</code> rather than <code>default</code>
+functions primarily to signal intent.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org19cd888" class="outline-3">
+<h3 id="org19cd888"><span class="section-number-3"> 10.2</span> Chaining Instances</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+If that were the extent of type class inference, it would not be all
+the impressive; it would be simply a mechanism of storing a list of
+instances for the elaborator to find in a lookup table. What makes
+type class inference powerful is that one can <i>chain</i> instances. That
+is, an instance declaration can in turn depend on an implicit instance
+of a type class. This causes class inference to chain through
+instances recursively, backtracking when necessary, in a Prolog-like
+search.
+</p>
+
+<p>
+For example, the following definition shows that if two types <code>α</code> and
+<code>β</code> are inhabited, then so is their product:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-9' mode="ace/mode/lean" readonly="true">instance prod_inhabited {α β : Type} [inhabited α] [inhabited β]
+                        : inhabited (prod α β) :=
+⟨(default α, default β)⟩</juicy-ace-editor><div id='lean-full-code-9' style='display:none'>namespace hide
+
+class inhabited (α : Type) :=
+(value : α)
+
+instance Prop_inhabited : inhabited Prop :=
+⟨true⟩
+
+instance bool_inhabited : inhabited bool :=
+⟨tt⟩
+
+instance nat_inhabited : inhabited nat :=
+⟨0⟩
+
+instance unit_inhabited : inhabited unit :=
+⟨()⟩
+
+def default (α : Type) [s : inhabited α] : α :=
+@inhabited.value α s
+instance prod_inhabited {α β : Type} [inhabited α] [inhabited β]
+                        : inhabited (prod α β) :=
+⟨(default α, default β)⟩
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-9').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+With this added to the earlier instance declarations, type class
+instance can infer, for example, a default element of <code>nat × bool × unit</code>:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-10' mode="ace/mode/lean" readonly="true">check default (nat × bool)
+eval default (nat × bool)</juicy-ace-editor><div id='lean-full-code-10' style='display:none'>namespace hide
+
+class inhabited (α : Type) :=
+(value : α)
+
+instance Prop_inhabited : inhabited Prop :=
+⟨true⟩
+
+instance bool_inhabited : inhabited bool :=
+⟨tt⟩
+
+instance nat_inhabited : inhabited nat :=
+⟨0⟩
+
+instance unit_inhabited : inhabited unit :=
+⟨()⟩
+
+def default (α : Type) [s : inhabited α] : α :=
+@inhabited.value α s
+
+instance prod_inhabited {α β : Type} [inhabited α] [inhabited β]
+                        : inhabited (prod α β) :=
+⟨(default α, default β)⟩
+
+check default (nat × bool)
+eval default (nat × bool)
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-10').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Given the expression <code>default (nat × bool)</code>, the elaborator is
+called on to infer an implicit argument <code>?M : inhabited (nat × bool)</code>.
+The instance <code>prod_inhabited</code> reduces this to inferring
+<code>?M1 : inhabited nat</code> and <code>?M2 : inhabited bool</code>. The first
+one is solved by the instance <code>nat_inhabited</code>. The second uses
+<code>bool_inhabited</code>.
+</p>
+
+<p>
+Similarly, we can inhabit function spaces with suitable constant
+functions:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-11' mode="ace/mode/lean" readonly="true">instance inhabited_fun (α : Type) {β : Type} [inhabited β] : inhabited (α → β) :=
+⟨(λ a : α, default β)⟩
+
+check default (nat → nat × bool)
+eval default (nat → nat × bool)</juicy-ace-editor><div id='lean-full-code-11' style='display:none'>namespace hide
+
+class inhabited (α : Type) :=
+(value : α)
+
+instance Prop_inhabited : inhabited Prop :=
+⟨true⟩
+
+instance bool_inhabited : inhabited bool :=
+⟨tt⟩
+
+instance nat_inhabited : inhabited nat :=
+⟨0⟩
+
+instance unit_inhabited : inhabited unit :=
+⟨()⟩
+
+def default (α : Type) [s : inhabited α] : α :=
+@inhabited.value α s
+
+instance prod_inhabited {α β : Type} [inhabited α] [inhabited β]
+                        : inhabited (prod α β) :=
+⟨(default α, default β)⟩
+
+instance inhabited_fun (α : Type) {β : Type} [inhabited β] : inhabited (α → β) :=
+⟨(λ a : α, default β)⟩
+
+check default (nat → nat × bool)
+eval default (nat → nat × bool)
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-11').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+In this case, type class inference finds the default element <code>λ (a : nat), (0, tt)</code>.
+</p>
+
+<p>
+As an exercise, try defining default instances for other types, such
+as sum types and the list type.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbc22f8a" class="outline-3">
+<h3 id="orgbc22f8a"><span class="section-number-3"> 10.3</span> Decidable Propositions</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+Let us consider another example of a type class defined in the
+standard library, namely the type class of <code>decidable</code>
+propositions. Roughly speaking, an element of <code>Prop</code> is said to be
+decidable if we can decide whether it is true or false. The
+distinction is only useful in constructive mathematics; classically,
+every proposition is decidable. Nonetheless, as we will see, the
+implementation of the type class allows for a smooth transition
+between constructive and classical logic.
+</p>
+
+<p>
+In the standard library, <code>decidable</code> is defined formally as follows:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-12' mode="ace/mode/lean" readonly="true">class inductive decidable (p : Prop) : Type
+| is_false : ¬p → decidable
+| is_true  :  p → decidable</juicy-ace-editor><div id='lean-full-code-12' style='display:none'>namespace hide
+
+class inductive decidable (p : Prop) : Type
+| is_false : ¬p → decidable
+| is_true  :  p → decidable
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-12').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Logically speaking, having an element <code>t : decidable p</code> is stronger
+than having an element <code>t : p ∨ ¬p</code>; it enables us to define values of
+an arbitrary type depending on the truth value of <code>p</code>. For example,
+for the expression <code>if p then a else b</code> to make sense, we need to know
+that <code>p</code> is decidable. That expression is syntactic sugar for <code>ite p a
+b</code>, where <code>ite</code> is defined as follows:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-13' mode="ace/mode/lean" readonly="true">def ite (c : Prop) [d : decidable c] {α : Type} (t e : α) : α :=
+decidable.rec_on d (λ hnc, e) (λ hc, t)</juicy-ace-editor><div id='lean-full-code-13' style='display:none'>namespace hide
+
+def ite (c : Prop) [d : decidable c] {α : Type} (t e : α) : α :=
+decidable.rec_on d (λ hnc, e) (λ hc, t)
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-13').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+The standard library also contains a variant of <code>ite</code> called <code>dite</code>,
+the dependent if-then-else expression. It is defined as follows:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-14' mode="ace/mode/lean" readonly="true">def dite (c : Prop) [d : decidable c] {α : Type} (t : c → α) (e : ¬ c → α) : α :=
+decidable.rec_on d (λ hnc : ¬ c, e hnc) (λ hc : c, t hc)</juicy-ace-editor><div id='lean-full-code-14' style='display:none'>namespace hide
+
+def dite (c : Prop) [d : decidable c] {α : Type} (t : c → α) (e : ¬ c → α) : α :=
+decidable.rec_on d (λ hnc : ¬ c, e hnc) (λ hc : c, t hc)
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-14').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+That is, in <code>dite c t e</code>, we can assume <code>hc : c</code> in the "then" branch,
+and <code>hnc : ¬ c</code> in the "else" branch.  To make <code>dite</code> more convenient
+to use, Lean allows us to write <code>if h : c then t else e</code> instead of
+<code>dite c (λ h : c, t) (λ h : ¬ c, e)</code>.
+</p>
+
+<p>
+In the standard library, we cannot prove that every proposition is
+decidable. But we can prove that <i>certain</i> propositions are
+decidable. For example, we can prove that basic operations like
+equality and comparisons on the natural numbers and the integers are
+decidable. Moreover, decidability is preserved under propositional
+connectives:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-15' mode="ace/mode/lean" readonly="true">check @and.decidable
+-- Π {p q : Prop} [hp : decidable p] [hq : decidable q], decidable (p ∧ q)
+
+check @or.decidable
+check @not.decidable
+check @implies.decidable
+</juicy-ace-editor><div id='lean-full-code-15' style='display:none'>check @and.decidable
+-- Π {p q : Prop} [hp : decidable p] [hq : decidable q], decidable (p ∧ q)
+
+check @or.decidable
+check @not.decidable
+check @implies.decidable
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-15').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Thus we can carry out definitions by cases on decidable predicates on
+the natural numbers:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-16' mode="ace/mode/lean" readonly="true">open nat
+
+def step (a b x : ℕ) : ℕ :=
+if x &lt; a ∨ x &gt; b then 0 else 1
+
+set_option pp.implicit true
+print definition step
+</juicy-ace-editor><div id='lean-full-code-16' style='display:none'>open nat
+
+def step (a b x : ℕ) : ℕ :=
+if x &lt; a ∨ x &gt; b then 0 else 1
+
+set_option pp.implicit true
+print definition step
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-16').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Turning on implicit arguments shows that the elaborator has inferred
+the decidability of the proposition <code>x &lt; a ∨ x &gt; b</code>, simply by
+applying appropriate instances.
+</p>
+
+<p>
+With the classical axioms, we can prove that every proposition is
+decidable. When you import the classical axioms, then, <code>decidable p</code>
+has an instance for every <code>p</code>, and the elaborator infers that value
+quickly. Thus all theorems in the standard library that rely on
+decidability assumptions are freely available in the classical
+library.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbb51ccb" class="outline-3">
+<h3 id="orgbb51ccb"><span class="section-number-3"> 10.4</span> Overloading with Type Classes</h3>
+<div class="outline-text-3" id="text-1-4">
+<p>
+We now consider the application of type classes that motivates their
+use in functional programming languages like Haskell, namely, to
+overload notation in a principled way. In Lean, a symbol like <code>+</code> can
+be given entirely unrelated meanings, a phenomenon that is sometimes
+called "ad-hoc" overloading. Typically, however, we use the <code>+</code> symbol to
+denote a binary function from a type to itself, that is, a function of
+type <code>α → α → α</code> for some type <code>α</code>. We can use type classes to infer
+an appropriate addition function for suitable types <code>α</code>. We will see
+in the next section that this is especially useful for developing
+algebraic hierarchies of structures in a formal setting.
+</p>
+
+<p>
+We can declare a type class <code>has_add α</code> as follows:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-17' mode="ace/mode/lean" readonly="true">universe variables u
+
+class has_add (α : Type u) :=
+(add : α → α → α)
+
+def add {α : Type u} [has_add α] : α → α → α := has_add.add
+
+local notation a `+` b := add a b</juicy-ace-editor><div id='lean-full-code-17' style='display:none'>namespace hide
+universe variables u
+
+class has_add (α : Type u) :=
+(add : α → α → α)
+
+def add {α : Type u} [has_add α] : α → α → α := has_add.add
+
+local notation a `+` b := add a b
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-17').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+The class <code>has_add α</code> is supposed to be inhabited exactly when there
+is an appropriate addition function for <code>α</code>. The <code>add</code> function is
+designed to find an instance of <code>has_add α</code> for the given type, <code>α</code>,
+and apply the corresponding binary addition function. The notation
+<code>a + b</code> thus refers to the addition that is appropriate to the type of
+<code>a</code> and <code>b</code>. We can the declare instances for <code>nat</code>, and <code>bool</code>:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-18' mode="ace/mode/lean" readonly="true">instance nat_has_add : has_add nat :=
+⟨nat.add⟩
+
+instance bool_has_add : has_add bool :=
+⟨bor⟩
+
+check 2 + 2    -- nat
+check tt + ff  -- bool</juicy-ace-editor><div id='lean-full-code-18' style='display:none'>namespace hide
+universe variables u
+
+class has_add (α : Type u) :=
+(add : α → α → α)
+
+def add {α : Type u} [has_add α] : α → α → α := has_add.add
+
+local notation a `+` b := add a b
+
+instance nat_has_add : has_add nat :=
+⟨nat.add⟩
+
+instance bool_has_add : has_add bool :=
+⟨bor⟩
+
+check 2 + 2    -- nat
+check tt + ff  -- bool
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-18').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+As with <code>inhabited</code> and <code>decidable</code>, the power of type class inference
+stems not only from the fact that the class enables the elaborator to
+look up appropriate instances, but also from the fact that it can
+chain instances to infer complex addition operations. For example,
+assuming that there are appropriate addition functions for types <code>α</code>
+and <code>β</code>, we can define addition on <code>α × β</code> pointwise:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-19' mode="ace/mode/lean" readonly="true">instance prod_has_add {α : Type u} {β : Type v} [has_add α] [has_add β] : has_add (α × β) :=
+⟨λ ⟨a₁, b₁⟩ ⟨a₂, b₂⟩, ⟨a₁+a₂, b₁+b₂⟩⟩
+
+check (1, 2) + (3, 4)    -- ℕ × ℕ
+eval  (1, 2) + (3, 4)    -- (4, 6)</juicy-ace-editor><div id='lean-full-code-19' style='display:none'>namespace hide
+universe variables u v
+class has_add (α : Type u) :=
+(add : α → α → α)
+
+def add {α : Type u} [has_add α] : α → α → α := has_add.add
+
+local notation a `+` b := add a b
+
+instance nat_has_add : has_add nat :=
+⟨nat.add⟩
+
+instance bool_has_add : has_add bool :=
+⟨bor⟩
+
+instance prod_has_add {α : Type u} {β : Type v} [has_add α] [has_add β] : has_add (α × β) :=
+⟨λ ⟨a₁, b₁⟩ ⟨a₂, b₂⟩, ⟨a₁+a₂, b₁+b₂⟩⟩
+
+check (1, 2) + (3, 4)    -- ℕ × ℕ
+eval  (1, 2) + (3, 4)    -- (4, 6)
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-19').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+We can similarly define pointwise addition of functions:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-20' mode="ace/mode/lean" readonly="true">instance fun_has_add {α : Type u} {β : Type v} [has_add β] : has_add (α → β) :=
+⟨λ f g x, f x + g x⟩
+
+check (λ x : nat, 1) + (λ x, 2)   -- ℕ → ℕ
+eval (λ x : nat, 1) + (λ x, 2)    -- λ (x : ℕ), 3</juicy-ace-editor><div id='lean-full-code-20' style='display:none'>namespace hide
+universe variables u v
+class has_add (α : Type u) :=
+(add : α → α → α)
+
+def add {α : Type u} [has_add α] : α → α → α := has_add.add
+
+local notation a `+` b := add a b
+
+instance nat_has_add : has_add nat :=
+⟨nat.add⟩
+
+instance bool_has_add : has_add bool :=
+⟨bor⟩
+
+instance prod_has_add {α : Type u} {β : Type v} [has_add α] [has_add β] : has_add (α × β) :=
+⟨λ ⟨a₁, b₁⟩ ⟨a₂, b₂⟩, ⟨a₁+a₂, b₁+b₂⟩⟩
+
+instance fun_has_add {α : Type u} {β : Type v} [has_add β] : has_add (α → β) :=
+⟨λ f g x, f x + g x⟩
+
+check (λ x : nat, 1) + (λ x, 2)   -- ℕ → ℕ
+eval (λ x : nat, 1) + (λ x, 2)    -- λ (x : ℕ), 3
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-20').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+As an exercise, try defining instances of <code>has_add</code> for lists,
+and show that they have the work as expected.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfb52c9c" class="outline-3">
+<h3 id="orgfb52c9c"><span class="section-number-3"> 10.5</span> Managing Type Class Inference</h3>
+<div class="outline-text-3" id="text-1-5">
+<p>
+You can ask Lean for information about the classes and instances that
+are currently in scope:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-21' mode="ace/mode/lean" readonly="true">print classes
+print instances inhabited
+</juicy-ace-editor><div id='lean-full-code-21' style='display:none'>print classes
+print instances inhabited
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-21').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+At times, you may find that the type class inference fails to find an
+expected instance, or, worse, falls into an infinite loop and times
+out. To help debug in these situations, Lean enables you to request a
+trace of the search:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-22' mode="ace/mode/lean" readonly="true">set_option trace.class_instances true
+</juicy-ace-editor><div id='lean-full-code-22' style='display:none'>set_option trace.class_instances true
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-22').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+If you add this to your file in Emacs mode and use <code>C-c C-x</code> to run an
+independent Lean process on your file, the output buffer will show a
+trace every time the type class resolution procedure is subsequently
+triggered.
+</p>
+
+<p>
+You can also limit the search depth (the default is 32):
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-23' mode="ace/mode/lean" readonly="true">set_option class.instance_max_depth 5
+</juicy-ace-editor><div id='lean-full-code-23' style='display:none'>set_option class.instance_max_depth 5
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-23').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Remember also that in the Emacs Lean mode, tab completion works in
+<code>set_option</code>, to help you find suitable options.
+</p>
+
+<p>
+As noted above, the type class instances in a given context represent
+a Prolog-like program, which gives rise to a backtracking search. Both
+the efficiency of the program and the solutions that are found can
+depend on the order in which the system tries the instance.  Instances
+which are declared last are tried first.  Moreover, if instances are
+declared in other modules, the order in which they are tried depends
+on the order in which namespaces are opened.  Instances declared in
+namespaces which are opened later are tried earlier.
+</p>
+
+<p>
+You can change the order that type classes instances are tried by
+assigning them a <i>priority</i>. When an instance is declared, it is
+assigned a priority value <code>std.priority.default</code>, defined to be 1000
+in module <code>init.core</code> in the standard library. You
+can assign other priorities when defining an instance, and you can
+later change the priority with the <code>attribute</code> command. The following
+example illustrates how this is done:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-24' mode="ace/mode/lean" readonly="true">class foo :=
+(a : nat) (b : nat)
+
+@[priority std.priority.default+1]
+instance i1 : foo :=
+⟨1, 1⟩
+
+instance i2 : foo :=
+⟨2, 2⟩
+
+example : foo.a = 1 := rfl
+
+@[priority std.priority.default+20]
+instance i3 : foo :=
+⟨3, 3⟩
+
+example : foo.a = 3 := rfl
+
+attribute [instance, priority 10] i3
+
+example : foo.a = 1 := rfl
+
+attribute [instance, priority std.priority.default-10] i1
+
+example : foo.a = 2 := rfl
+</juicy-ace-editor><div id='lean-full-code-24' style='display:none'>class foo :=
+(a : nat) (b : nat)
+
+@[priority std.priority.default+1]
+instance i1 : foo :=
+⟨1, 1⟩
+
+instance i2 : foo :=
+⟨2, 2⟩
+
+example : foo.a = 1 := rfl
+
+@[priority std.priority.default+20]
+instance i3 : foo :=
+⟨3, 3⟩
+
+example : foo.a = 3 := rfl
+
+attribute [instance, priority 10] i3
+
+example : foo.a = 1 := rfl
+
+attribute [instance, priority std.priority.default-10] i1
+
+example : foo.a = 2 := rfl
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-24').text());">Try it yourself &raquo;</button></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb34d91c" class="outline-3">
+<h3 id="orgb34d91c"><span class="section-number-3"> 10.6</span> Coercions</h3>
+<div class="outline-text-3" id="text-1-6">
+<p>
+The most basic type of coercion maps elements of one type to
+another. For example, a coercion from <code>nat</code> to <code>int</code> allows us to view
+any element <code>n : nat</code> as an element of <code>int</code>. But some coercions
+depend on parameters; for example, for any type <code>α</code>, we can view any
+element <code>l : list α</code> as an element of <code>set α</code>, namely, the set of
+elements occurring in the list. The corresponding coercion is defined
+on the "family" of types <code>list α</code>, parameterized by <code>α</code>.
+</p>
+
+<p>
+Lean allows us to declare three kinds of coercions:
+</p>
+<ul class="org-ul">
+<li>from a family of types to another family of types</li>
+<li>from a family of types to the class of sorts</li>
+<li>from a family of types to the class of function types</li>
+</ul>
+<p>
+The first kind of coercion allows us to view any element of a member
+of the source family as an element of a corresponding member of the
+target family. The second kind of coercion allows us to view any
+element of a member of the source family as a type. The third kind of
+coercion allows us to view any element of the source family as a function.
+Let us consider each of these in turn.
+</p>
+
+<p>
+In Lean, coercions are implemented on top of the type class resolution
+framework. We define a coercion from <code>α</code> to <code>β</code> by declaring an instance
+of <code>has_coe α β</code>. For example, we can define a coercion from <code>bool</code>
+to <code>Prop</code> as follows:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-25' mode="ace/mode/lean" readonly="true">instance bool_to_Prop : has_coe bool Prop :=
+⟨λ b, b = tt⟩
+-- Now, we can use bool terms in if-then-else terms
+vm_eval if tt then "hello" else "world"
+vm_eval if ff then "hello" else "world"
+</juicy-ace-editor><div id='lean-full-code-25' style='display:none'>instance bool_to_Prop : has_coe bool Prop :=
+⟨λ b, b = tt⟩
+-- Now, we can use bool terms in if-then-else terms
+vm_eval if tt then "hello" else "world"
+vm_eval if ff then "hello" else "world"
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-25').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+We can define a coercion from <code>list α</code> to <code>set α</code> as follows:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-26' mode="ace/mode/lean" readonly="true">universe variable u
+
+def list.to_set {α : Type u} : list α → set α
+| []     := ∅
+| (h::t) := {h} ∪ list.to_set t
+
+instance list_to_set_coe (α : Type u) : has_coe (list α) (set α) :=
+⟨list.to_set⟩
+
+def s : set nat  := {1, 2}
+def l : list nat := [3, 4]
+
+check s ∪ l -- set nat
+</juicy-ace-editor><div id='lean-full-code-26' style='display:none'>universe variable u
+
+def list.to_set {α : Type u} : list α → set α
+| []     := ∅
+| (h::t) := {h} ∪ list.to_set t
+
+instance list_to_set_coe (α : Type u) : has_coe (list α) (set α) :=
+⟨list.to_set⟩
+
+def s : set nat  := {1, 2}
+def l : list nat := [3, 4]
+
+check s ∪ l -- set nat
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-26').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+Coercions are only considered if the given and expected types do not
+contain metavariables at elaboration time. In the following example,
+when we elaborate the union operator, the type of <code>[3, 2]</code> is <code>list ?m</code>,
+and a coercion will not be considered since it contains metavariables.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-27' mode="ace/mode/lean" readonly="true">/- The following check command produces an error. -/
+-- check s ∪ [3, 2]</juicy-ace-editor><div id='lean-full-code-27' style='display:none'>universe variable u
+
+def list.to_set {α : Type u} : list α → set α
+| []     := ∅
+| (h::t) := {h} ∪ list.to_set t
+
+instance list_to_set_coe (α : Type u) : has_coe (list α) (set α) :=
+⟨list.to_set⟩
+
+def s : set nat  := {1, 2}
+
+/- The following check command produces an error. -/
+-- check s ∪ [3, 2]
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-27').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+We can workaround this issue by using a type ascription.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-28' mode="ace/mode/lean" readonly="true">check s ∪ [(3:nat), 2]
+-- or
+check s ∪ ([3, 2] : list nat)</juicy-ace-editor><div id='lean-full-code-28' style='display:none'>universe variable u
+
+def list.to_set {α : Type u} : list α → set α
+| []     := ∅
+| (h::t) := {h} ∪ list.to_set t
+
+instance list_to_set_coe (α : Type u) : has_coe (list α) (set α) :=
+⟨list.to_set⟩
+
+def s : set nat  := {1, 2}
+
+check s ∪ [(3:nat), 2]
+-- or
+check s ∪ ([3, 2] : list nat)
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-28').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+In the examples above, you may have noticed the symbol <code>↑</code> produced
+by the <code>check</code> commands. It is the lift operator, <code>↑t</code> is notation
+for <code>coe t</code>. We can use this operator to force a coercion to be
+introduced in a particular place. It is also helpful to make our
+intent clear, and workaround limitations of the coercion resolution system.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-29' mode="ace/mode/lean" readonly="true">check s ∪ ↑[3, 2]
+
+variables n m : nat
+variable i : int
+check i + ↑n + ↑m
+check i + ↑(n + m)
+
+/- In the above two examples, the coercions are not
+   strictly necessary since Lean will insert implicit
+   nat → int coercions. However, the following example
+   doesn't work because the expected type of i is a nat
+   to match the type of n (and no int → nat coercion
+   exists). -/
+-- check n + i
+
+/- Assuming we want the more general type, we can
+   insert an explicit ↑ to coerce n to int. -/
+check ↑n + i</juicy-ace-editor><div id='lean-full-code-29' style='display:none'>universe variable u
+
+def list.to_set {α : Type u} : list α → set α
+| []     := ∅
+| (h::t) := {h} ∪ list.to_set t
+
+instance list_to_set_coe (α : Type u) : has_coe (list α) (set α) :=
+⟨list.to_set⟩
+
+def s : set nat  := {1, 2}
+
+check s ∪ ↑[3, 2]
+
+variables n m : nat
+variable i : int
+check i + ↑n + ↑m
+check i + ↑(n + m)
+
+/- In the above two examples, the coercions are not
+   strictly necessary since Lean will insert implicit
+   nat → int coercions. However, the following example
+   doesn't work because the expected type of i is a nat
+   to match the type of n (and no int → nat coercion
+   exists). -/
+-- check n + i
+
+/- Assuming we want the more general type, we can
+   insert an explicit ↑ to coerce n to int. -/
+check ↑n + i
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-29').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+The standard library defines a coercion from subtype <code>{x : α // p x}</code> to <code>α</code>
+as follows:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-30' mode="ace/mode/lean" readonly="true">instance coe_subtype {α : Type u} {p : α → Prop} : has_coe {x // p x} α :=
+⟨λ s, subtype.elt_of s⟩</juicy-ace-editor><div id='lean-full-code-30' style='display:none'>namespace hide
+universe variable u
+instance coe_subtype {α : Type u} {p : α → Prop} : has_coe {x // p x} α :=
+⟨λ s, subtype.elt_of s⟩
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-30').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+Lean will also chain coercions as necessary. Actually, the type class
+<code>has_coe_t</code> is the transitive closure of <code>has_coe</code>.
+You may have noticed that the type of <code>coe</code> depends on <code>has_lift_t</code>,
+the transitive closure of the type class <code>has_lift</code>, instead of
+<code>has_coe_t</code>. Every instance of <code>has_coe_t</code> is also an instance
+of <code>has_lift_t</code>, but the elaborator only introduces automatically
+instances of <code>has_coe_t</code>. That is, to be able to coerce using
+an instance of <code>has_lift_t</code>, we must use the operator <code>↑</code>.
+In the standard library, we have the following instance:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-31' mode="ace/mode/lean" readonly="true">namespace hide
+universe variables u v
+
+instance lift_list {a : Type u} {b : Type v} [has_lift_t a b] : has_lift (list a) (list b) :=
+⟨λ l, list.map (@coe a b _) l⟩
+
+variables s : list nat
+variables r : list int
+check ↑s ++ r
+
+end hide
+</juicy-ace-editor><div id='lean-full-code-31' style='display:none'>namespace hide
+universe variables u v
+
+instance lift_list {a : Type u} {b : Type v} [has_lift_t a b] : has_lift (list a) (list b) :=
+⟨λ l, list.map (@coe a b _) l⟩
+
+variables s : list nat
+variables r : list int
+check ↑s ++ r
+
+end hide
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-31').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+It is not an instance of <code>has_coe</code> because lists are frequently used for writing programs,
+and we do not want a linear-time operation to be silently introduced by Lean, and potentially mask
+mistakes performed by the user. By forcing the user to write <code>↑</code>, she is making her intent
+clear to Lean.
+</p>
+
+<p>
+Let us now consider the second kind of coercion. By the <i>class of
+sorts</i>, we mean the collection of universes <code>Type u</code>. A coercion of
+the second kind is of the form
+</p>
+<div class="org-src-container">
+
+<pre class="src src-text">c : &#928; x1 : A1, ..., xn : An, F x1 ... xn &#8594; Type u
+</pre>
+</div>
+<p>
+where <code>F</code> is a family of types as above. This allows
+us to write <code>s : t</code> whenever <code>t</code> is of type <code>F a1 ... an</code>. In other
+words, the coercion allows us to view the elements of <code>F a1 ... an</code> as
+types. This is very useful when
+defining algebraic structures in which one component, the carrier of
+the structure, is a <code>Type</code>. For example, we can define a semigroup as
+follows:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-33' mode="ace/mode/lean" readonly="true">universe variable u
+
+structure Semigroup : Type (u+1) :=
+(carrier : Type u)
+(mul : carrier → carrier → carrier)
+(mul_assoc : ∀ a b c : carrier, mul (mul a b) c = mul a (mul b c))
+
+instance Semigroup_has_mul (S : Semigroup) : has_mul (S^.carrier) :=
+⟨S^.mul⟩
+</juicy-ace-editor><div id='lean-full-code-33' style='display:none'>universe variable u
+
+structure Semigroup : Type (u+1) :=
+(carrier : Type u)
+(mul : carrier → carrier → carrier)
+(mul_assoc : ∀ a b c : carrier, mul (mul a b) c = mul a (mul b c))
+
+instance Semigroup_has_mul (S : Semigroup) : has_mul (S^.carrier) :=
+⟨S^.mul⟩
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-33').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+In other words, a semigroup consists of a type, <code>carrier</code>, and a
+multiplication, <code>mul</code>, with the property that the multiplication is
+associative. The <code>instance</code> command allows us to write <code>a * b</code> instead
+of <code>Semigroup.mul S a b</code> whenever we have <code>a b : S^.carrier</code>; notice
+that Lean can infer the argument <code>S</code> from the types of <code>a</code> and <code>b</code>.
+The function <code>Semigroup.carrier</code> maps the class <code>Semigroup</code> to the
+sort <code>Type u</code>:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-34' mode="ace/mode/lean" readonly="true">check Semigroup.carrier</juicy-ace-editor><div id='lean-full-code-34' style='display:none'>universe variable u
+
+structure Semigroup : Type (u+1) :=
+(carrier : Type u)
+(mul : carrier → carrier → carrier)
+(mul_assoc : ∀ a b c : carrier, mul (mul a b) c = mul a (mul b c))
+
+instance Semigroup_has_mul (S : Semigroup) : has_mul (S^.carrier) :=
+⟨S^.mul⟩
+check Semigroup.carrier
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-34').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+If we declare this function to be a coercion, then whenever we have a
+semigroup <code>S : Semigroup</code>, we can write <code>a : S</code> instead of <code>a : S^.carrier</code>:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-35' mode="ace/mode/lean" readonly="true">instance Semigroup_to_sort : has_coe_to_sort Semigroup :=
+{S := Type u, coe := λ S, S^.carrier}
+
+example (S : Semigroup) (a b c : S) : (a * b) * c = a * (b * c) :=
+Semigroup.mul_assoc _ a b c</juicy-ace-editor><div id='lean-full-code-35' style='display:none'>universe variable u
+
+structure Semigroup : Type (u+1) :=
+(carrier : Type u)
+(mul : carrier → carrier → carrier)
+(mul_assoc : ∀ a b c : carrier, mul (mul a b) c = mul a (mul b c))
+
+instance Semigroup_has_mul (S : Semigroup) : has_mul (S^.carrier) :=
+⟨S^.mul⟩
+
+instance Semigroup_to_sort : has_coe_to_sort Semigroup :=
+{S := Type u, coe := λ S, S^.carrier}
+
+example (S : Semigroup) (a b c : S) : (a * b) * c = a * (b * c) :=
+Semigroup.mul_assoc _ a b c
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-35').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+It is the coercion that makes it possible to write <code>(a b c : S)</code>.
+Note that, we define an instance of <code>has_coe_to_sort Semigroup</code>
+instead of <code>has_coe Semigroup Type</code>. The reason is that when
+Lean needs a coercion to sort, it only knows it needs a type, but, in
+general, the universe is not known. The field <code>S</code> in the class
+<code>has_coe_to_sort</code> is used to specify the universe we are coercing too.
+</p>
+
+<p>
+By the <i>class of function types</i>, we mean the collection of Pi types
+<code>Π z : B, C</code>. The third kind of coercion has the form
+</p>
+<div class="org-src-container">
+
+<pre class="src src-text">c : &#928; x1 : A1, ..., xn : An, y : F x1 ... xn, &#928; z : B, C
+</pre>
+</div>
+<p>
+where <code>F</code> is again a family of types and <code>B</code> and <code>C</code> can depend on
+<code>x1, ..., xn, y</code>. This makes it possible to write <code>t s</code> whenever <code>t</code>
+is an element of <code>F a1 ... an</code>. In other words, the coercion enables
+us to view elements of <code>F a1 ... an</code> as functions. Continuing the
+example above, we can define the notion of a morphism between
+semigroups <code>S1</code> and <code>S2</code>. That is, a function from the
+carrier of <code>S1</code> to the carrier of <code>S2</code> (note the implicit coercion)
+that respects the multiplication. The projection <code>morphism.mor</code> takes
+a morphism to the underlying function:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-37' mode="ace/mode/lean" readonly="true">instance Semigroup_to_sort : has_coe_to_sort Semigroup :=
+{S := _, coe := λ S, S^.carrier}
+
+structure morphism (S1 S2 : Semigroup) : Type _ :=
+(mor : S1 → S2)
+(resp_mul : ∀ a b : S1, mor (a * b) = (mor a) * (mor b))
+
+check @morphism.mor</juicy-ace-editor><div id='lean-full-code-37' style='display:none'>universe variable u
+
+structure Semigroup : Type (u+1) :=
+(carrier : Type u)
+(mul : carrier → carrier → carrier)
+(mul_assoc : ∀ a b c : carrier, mul (mul a b) c = mul a (mul b c))
+
+instance Semigroup_has_mul (S : Semigroup) : has_mul (S^.carrier) :=
+⟨S^.mul⟩
+
+instance Semigroup_to_sort : has_coe_to_sort Semigroup :=
+{S := _, coe := λ S, S^.carrier}
+
+structure morphism (S1 S2 : Semigroup) : Type _ :=
+(mor : S1 → S2)
+(resp_mul : ∀ a b : S1, mor (a * b) = (mor a) * (mor b))
+
+check @morphism.mor
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-37').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+As a result, it is a prime candidate for the third type of coercion.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-38' mode="ace/mode/lean" readonly="true">instance morphism_to_fun (S1 S2 : Semigroup) : has_coe_to_fun (morphism S1 S2) :=
+{ F   := λ _, S1 → S2,
+  coe := λ m, m^.mor }
+
+lemma resp_mul {S1 S2 : Semigroup} (f : morphism S1 S2) (a b : S1) : f (a * b) = f a * f b :=
+f^.resp_mul a b
+
+example (S1 S2 : Semigroup) (f : morphism S1 S2) (a : S1) :
+  f (a * a * a) = f a * f a * f a :=
+calc
+  f (a * a * a) = f (a * a) * f a : by rw [resp_mul f]
+            ... = f a * f a * f a : by rw [resp_mul f]</juicy-ace-editor><div id='lean-full-code-38' style='display:none'>universe variable u
+
+structure Semigroup : Type (u+1) :=
+(carrier : Type u)
+(mul : carrier → carrier → carrier)
+(mul_assoc : ∀ a b c : carrier, mul (mul a b) c = mul a (mul b c))
+
+instance Semigroup_has_mul (S : Semigroup) : has_mul (S^.carrier) :=
+⟨S^.mul⟩
+
+
+instance Semigroup_to_sort : has_coe_to_sort Semigroup :=
+{S := _, coe := λ S, S^.carrier}
+
+structure morphism (S1 S2 : Semigroup) : Type _ :=
+(mor : S1 → S2)
+(resp_mul : ∀ a b : S1, mor (a * b) = (mor a) * (mor b))
+
+instance morphism_to_fun (S1 S2 : Semigroup) : has_coe_to_fun (morphism S1 S2) :=
+{ F   := λ _, S1 → S2,
+  coe := λ m, m^.mor }
+
+lemma resp_mul {S1 S2 : Semigroup} (f : morphism S1 S2) (a b : S1) : f (a * b) = f a * f b :=
+f^.resp_mul a b
+
+example (S1 S2 : Semigroup) (f : morphism S1 S2) (a : S1) :
+  f (a * a * a) = f a * f a * f a :=
+calc
+  f (a * a * a) = f (a * a) * f a : by rw [resp_mul f]
+            ... = f a * f a * f a : by rw [resp_mul f]
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-38').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+With the coercion in place, we can write <code>f (a * a * a)</code> instead of
+<code>morphism.mor f (a * a * a)</code>. When the <code>morphism</code>, <code>f</code>, is used where
+a function is expected, Lean inserts the coercion.
+Similar to <code>has_coe_to_sort</code>, we have yet another class <code>has_coe_to_fun</code>
+for the this class of coercions. The field <code>F</code> is used to specify
+function type we are coercing too. This type may depend on
+the type we are coercing from.
+</p>
+
+<p>
+Finally, <code>⇑f</code> and <code>↥S</code> are notations for <code>coe_fn f</code> and <code>coe_sort S</code>.
+They are the coercion operators for the function and sort classes.
+</p>
+
+<p>
+We can instruct Lean's pretty-printer to hide the operators <code>↑</code> and <code>⇑</code>
+with <code>set_option</code>.
+</p>
+
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-39' mode="ace/mode/lean" readonly="true">theorem test (S1 S2 : Semigroup) (f : morphism S1 S2) (a : S1) :
+  f (a * a * a) = f a * f a * f a :=
+calc
+  f (a * a * a) = f (a * a) * f a : by rw [resp_mul f]
+            ... = f a * f a * f a : by rw [resp_mul f]
+
+check @test
+set_option pp.coercions false
+check @test</juicy-ace-editor><div id='lean-full-code-39' style='display:none'>universe variable u
+
+structure Semigroup : Type (u+1) :=
+(carrier : Type u)
+(mul : carrier → carrier → carrier)
+(mul_assoc : ∀ a b c : carrier, mul (mul a b) c = mul a (mul b c))
+
+instance Semigroup_has_mul (S : Semigroup) : has_mul (S^.carrier) :=
+⟨S^.mul⟩
+
+
+instance Semigroup_to_sort : has_coe_to_sort Semigroup :=
+{S := _, coe := λ S, S^.carrier}
+
+structure morphism (S1 S2 : Semigroup) : Type _ :=
+(mor : S1 → S2)
+(resp_mul : ∀ a b : S1, mor (a * b) = (mor a) * (mor b))
+
+instance morphism_to_fun (S1 S2 : Semigroup) : has_coe_to_fun (morphism S1 S2) :=
+{ F   := λ _, S1 → S2,
+  coe := λ m, m^.mor }
+
+lemma resp_mul {S1 S2 : Semigroup} (f : morphism S1 S2) (a b : S1) : f (a * b) = f a * f b :=
+f^.resp_mul a b
+
+
+theorem test (S1 S2 : Semigroup) (f : morphism S1 S2) (a : S1) :
+  f (a * a * a) = f a * f a * f a :=
+calc
+  f (a * a * a) = f (a * a) * f a : by rw [resp_mul f]
+            ... = f a * f a * f a : by rw [resp_mul f]
+
+check @test
+set_option pp.coercions false
+check @test
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-39').text());">Try it yourself &raquo;</button></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

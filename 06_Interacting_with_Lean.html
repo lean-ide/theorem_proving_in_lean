@@ -1,0 +1,548 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2017-02-02 Thu 16:09 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Theorem Proving in Lean</title>
+<meta name="generator" content="Org mode" />
+<meta name="author" content="[[http://www.andrew.cmu.edu/user/avigad][Jeremy Avigad]]Jeremy Avigad" />
+<link rel="stylesheet" href="css/tutorial.css"/>
+<link rel="stylesheet" href="css/code.css"/>
+<script type="text/javascript" charset="utf-8">if(!window.PolymerGestures) { var head = document.getElementsByTagName('head')[0]; var js = document.createElement("script"); js.type = "text/javascript"; js.src = "//cdn.jsdelivr.net/webcomponentsjs/0.7.20/webcomponents.min.js"; head.appendChild(js); } </script>
+<link rel='import' href='juicy-ace-editor.html'/>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Theorem Proving in Lean</h1>
+
+<div id="outline-container-orgd162bfc" class="outline-2">
+<h2 id="orgd162bfc"><span class="section-number-2"> 6</span> Interacting with Lean</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+You are now familiar with the fundamentals of dependent type theory,
+both as a language for defining mathematical objects and a language
+for constructing proofs. The one thing you are missing is a mechanism
+for defining new data types. We will fill this gap in the next chapter,
+which introduces the notion of an <i>inductive data type</i>. But first, in
+this chapter, we take a break from the mechanics of type theory to
+explore some pragmatic aspects of interacting with Lean.
+</p>
+</div>
+
+<div id="outline-container-orgdbe0c26" class="outline-3">
+<h3 id="Displaying_Information"><a id="orgdbe0c26"></a><span class="section-number-3"> 6.1</span> Displaying Information</h3>
+<div class="outline-text-3" id="text-Displaying_Information">
+<p>
+There are a number of ways in which you can query Lean for information
+about its current state and the objects and theorems that are
+available in the current context. You have already seen two of the
+most common ones, <code>check</code> and <code>eval</code>. Remember that <code>check</code> is often
+used in conjunction with the <code>@</code> operator, which makes all of the
+arguments to a theorem or definition explicit. In addition, you can
+use the <code>print</code> command to get information about any identifier. If
+the identifier denotes a definition or theorem, Lean prints the type
+of the symbol, and its definition. If it is a constant or an axiom,
+Lean indicates that fact, and shows the type.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-1' mode="ace/mode/lean" readonly="true">-- examples with equality
+check eq
+check @eq
+check eq.symm
+check @eq.symm
+
+print eq.symm
+
+-- examples with and
+check and
+check and.intro
+check @and.intro
+
+-- examples with addition
+check add
+check @add
+eval add 3 2
+print add
+
+-- a user-defined function
+def foo {α : Type} (x : α) : α := x
+
+check foo
+check @foo
+eval foo
+eval (foo @nat.zero)
+print foo
+</juicy-ace-editor><div id='lean-full-code-1' style='display:none'>-- examples with equality
+check eq
+check @eq
+check eq.symm
+check @eq.symm
+
+print eq.symm
+
+-- examples with and
+check and
+check and.intro
+check @and.intro
+
+-- examples with addition
+check add
+check @add
+eval add 3 2
+print add
+
+-- a user-defined function
+def foo {α : Type} (x : α) : α := x
+
+check foo
+check @foo
+eval foo
+eval (foo @nat.zero)
+print foo
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-1').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+There are other useful <code>print</code> commands:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-text">print definition             : display definition
+print inductive              : display an inductive type and its constructors
+print notation               : display all notation
+print notation &lt;tokens&gt;      : display notation using any of the tokens
+print axioms                 : display assumed axioms
+print options                : display options set by user
+print prefix &lt;namespace&gt;     : display all declarations in the namespace
+print classes                : display all classes
+print instances &lt;class name&gt; : display all instances of the given class
+print fields &lt;structure&gt;     : display all "fields" of a structure
+</pre>
+</div>
+<p>
+We will discuss inductive types, structures, classes, instances in the
+next four chapters. Here are examples of how these commands are used:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-3' mode="ace/mode/lean" readonly="true">print notation
+print notation + * -
+print axioms
+print options
+print prefix nat
+print prefix nat.le
+print classes
+print instances ring
+print fields ring
+</juicy-ace-editor><div id='lean-full-code-3' style='display:none'>print notation
+print notation + * -
+print axioms
+print options
+print prefix nat
+print prefix nat.le
+print classes
+print instances ring
+print fields ring
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-3').text());">Try it yourself &raquo;</button></div>
+</div>
+
+
+<p>
+The behavior of the generic print command is determined by its
+argument, so that the following pairs of commands all do the same
+thing.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-4' mode="ace/mode/lean" readonly="true">print add
+print definition add
+
+print +
+print notation +
+
+print nat
+print inductive nat
+
+print group
+print inductive group
+</juicy-ace-editor><div id='lean-full-code-4' style='display:none'>print add
+print definition add
+
+print +
+print notation +
+
+print nat
+print inductive nat
+
+print group
+print inductive group
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-4').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Moreover, both <code>print group</code> and <code>print inductive group</code> recognize
+that a group is a structure (see <a href="#" onclick="myModule.loadTutorial('09_Structures_and_Records.html', 'Structures_and_Records')">Chapter 9</a>), and so print the fields as
+well.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc336cef" class="outline-3">
+<h3 id="Setting_Options"><a id="orgc336cef"></a><span class="section-number-3"> 6.2</span> Setting Options</h3>
+<div class="outline-text-3" id="text-Setting_Options">
+<p>
+Lean maintains a number of internal variables that can be set by users
+to control its behavior. The syntax for doing so is as follows:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-text">set_option &lt;name&gt; &lt;value&gt;
+</pre>
+</div>
+
+<p>
+One very useful family of options controls the way Lean's <i>pretty-
+printer</i> displays terms. The following options take an input of true
+or false:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-text">pp.implicit  : display implicit arguments
+pp.universes : display hidden universe parameters
+pp.coercions : show coercions
+pp.notation  : display output using defined notations
+pp.beta      : beta reduce terms before displaying them
+</pre>
+</div>
+<p>
+In Lean, <i>coercions</i> can be inserted automatically to cast an element
+of one data type to another, for example, to cast an element of <code>nat</code>
+to an element of <code>int</code>. We will say more about them later.
+</p>
+
+<p>
+As an example, the following settings yield much longer output:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-7' mode="ace/mode/lean" readonly="true">set_option pp.implicit true
+set_option pp.universes true
+set_option pp.notation false
+set_option pp.numerals false
+
+check 2 + 2 = 4
+eval (λ x, x + 2) = (λ x, x + 3)
+check (λ x, x + 1) 1
+
+set_option pp.beta false
+check (λ x, x + 1) 1
+</juicy-ace-editor><div id='lean-full-code-7' style='display:none'>set_option pp.implicit true
+set_option pp.universes true
+set_option pp.notation false
+set_option pp.numerals false
+
+check 2 + 2 = 4
+eval (λ x, x + 2) = (λ x, x + 3)
+check (λ x, x + 1) 1
+
+set_option pp.beta false
+check (λ x, x + 1) 1
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-7').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Pretty printing additional information is often very useful when you
+are debugging a proof, or trying to understand a cryptic error
+message. Too much information can be overwhelming, though, and Lean's
+defaults are generally sufficient for ordinary interactions.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc53ede8" class="outline-3">
+<h3 id="orgc53ede8"><span class="section-number-3"> 6.3</span> Using the Library</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+To use Lean effectively you will inevitably need to make use of
+definitions and theorems in the library. Recall that the <code>import</code>
+command at the beginning of a file imports previously compiled results
+from other files, and that importing is transitive; if you import
+<code>foo</code> and <code>foo</code> imports <code>bar</code>, then the definitions and theorems from
+<code>bar</code> are available to you as well. But the act of opening a namespace,
+which provides shorter names,
+does not carry over. In each file, you need to open the namespaces
+you wish to use.
+</p>
+
+<p>
+In general, it is important for you to be familiar with the library
+and its contents, so you know what theorems, definitions, notations,
+and resources are available to you. Below we will see that Lean's
+editor modes can also help you find things you need, but studying the
+contents of the library directly is often unavoidable. Lean's standard
+library can be found online, on github:
+</p>
+<blockquote>
+<p>
+<a target='_blank' href="https://github.com/leanprover/lean/tree/master/library">https://github.com/leanprover/lean/tree/master/library</a>
+</p>
+</blockquote>
+<p>
+You can see the contents of the directories and files using github's
+browser interface. If you have installed Lean on your own computer,
+you can find the library in the <code>lean</code> folder, and explore it
+with your file manager. Comment headers at the top of each file
+provide additional information.
+</p>
+
+<p>
+Lean's library developers follow general naming guidelines to make it
+easier to guess the name of a theorem you need, or to find it using
+tab completion in editors with a Lean mode that supports this, which
+is discussed in the next section. Identifiers are generally
+<code>snake_case</code>, which is to say, they are composed of words written in
+lower case separated by underscores. For the most part, we rely on
+descriptive names. Often the name of theorem simply describes the
+conclusion:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-8' mode="ace/mode/lean" readonly="true">open nat
+
+check succ_ne_zero
+check @mul_zero
+check @mul_one
+check @sub_add_eq_add_sub
+check @le_iff_lt_or_eq
+</juicy-ace-editor><div id='lean-full-code-8' style='display:none'>open nat
+
+check succ_ne_zero
+check @mul_zero
+check @mul_one
+check @sub_add_eq_add_sub
+check @le_iff_lt_or_eq
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-8').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+If only a prefix of the description is enough to convey the meaning,
+the name may be made even shorter:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-9' mode="ace/mode/lean" readonly="true">check @neg_neg
+check pred_succ</juicy-ace-editor><div id='lean-full-code-9' style='display:none'>open nat
+
+check @neg_neg
+check pred_succ
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-9').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+Sometimes, to disambiguate the name of theorem or better convey the
+intended reference, it is necessary to describe some of the
+hypotheses. The word "of" is used to separate these hypotheses:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-10' mode="ace/mode/lean" readonly="true">check @nat.lt_of_succ_le
+check @lt_of_not_ge
+check @lt_of_le_of_ne
+check @add_lt_add_of_lt_of_le
+</juicy-ace-editor><div id='lean-full-code-10' style='display:none'>check @nat.lt_of_succ_le
+check @lt_of_not_ge
+check @lt_of_le_of_ne
+check @add_lt_add_of_lt_of_le
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-10').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+Sometimes the word "left" or "right" is helpful to describe variants
+of a theorem.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-11' mode="ace/mode/lean" readonly="true">check @add_le_add_left
+check @add_le_add_right
+</juicy-ace-editor><div id='lean-full-code-11' style='display:none'>check @add_le_add_left
+check @add_le_add_right
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-11').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+We can also use the word "self" to indicate a repeated argument:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-12' mode="ace/mode/lean" readonly="true">check mul_inv_self
+check neg_add_self
+</juicy-ace-editor><div id='lean-full-code-12' style='display:none'>check mul_inv_self
+check neg_add_self
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-12').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+Remember that identifiers in Lean can be organized into hierarchical
+namespaces. For example, the theorem named <code>lt_of_succ_le</code> in the
+namespace <code>nat</code> has full name <code>nat.lt_of_succ_le</code>, but the shorter
+name is made available by the command <code>open nat</code>. We will see in
+<a href="#" onclick="myModule.loadTutorial('07_Inductive_Types.html', 'Inductive_Types')">Chapter 7</a> and <a href="#" onclick="myModule.loadTutorial('09_Structures_and_Records.html', 'Structures_and_Records')">Chapter 9</a> that defining structures and inductive data
+types in Lean generates associated operations, and these are stored in
+a namespace with the same name as the type under definition. For
+example, the product type comes with the following opens:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-13' mode="ace/mode/lean" readonly="true">check @prod.mk
+check @prod.fst
+check @prod.snd
+check @prod.rec
+</juicy-ace-editor><div id='lean-full-code-13' style='display:none'>check @prod.mk
+check @prod.fst
+check @prod.snd
+check @prod.rec
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-13').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+The first is used to construct a pair, whereas the next two,
+<code>prod.fst</code> and <code>prod.snd</code>, project the two elements. The last,
+<code>prod.rec</code>, provides another mechanism for defining functions on a
+product in terms of a function on the two components. Names like
+<code>prod.rec</code> are <i>protected</i>, which means that one has to use the full
+name even when the <code>prod</code> namespace is open.
+</p>
+
+<p>
+With the propositions as types correspondence, logical connectives are
+also instances of inductive types, and so we tend to use dot notation for them as well:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-14' mode="ace/mode/lean" readonly="true">check @and.intro
+check @and.elim
+check @and.left
+check @and.right
+check @or.inl
+check @or.inr
+check @or.elim
+check @exists.intro
+check @exists.elim
+check @eq.refl
+check @eq.subst
+</juicy-ace-editor><div id='lean-full-code-14' style='display:none'>check @and.intro
+check @and.elim
+check @and.left
+check @and.right
+check @or.inl
+check @or.inr
+check @or.elim
+check @exists.intro
+check @exists.elim
+check @eq.refl
+check @eq.subst
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-14').text());">Try it yourself &raquo;</button></div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgcbfec9e" class="outline-3">
+<h3 id="Notation_and_Abbreviations"><a id="orgcbfec9e"></a><span class="section-number-3"> 6.4</span> Notation and Abbreviations</h3>
+<div class="outline-text-3" id="text-Notation_and_Abbreviations">
+<p>
+Lean's parser is an instance of a Pratt parser, a non-backtracking
+parser that is fast and flexible. You can read about Pratt parsers in
+a number of places online, such as here:
+</p>
+<blockquote>
+<p>
+<a target='_blank' href="http://en.wikipedia.org/wiki/Pratt_parser">http://en.wikipedia.org/wiki/Pratt_parser</a>
+<a target='_blank' href="http://eli.thegreenplace.net/2010/01/02/top-down-operator-precedence-parsing">http://eli.thegreenplace.net/2010/01/02/top-down-operator-precedence-parsing</a>
+</p>
+</blockquote>
+<p>
+Identifiers can include any alphanumeric characters, including Greek
+characters (other than Π , Σ , and λ , which, as we have seen, have a
+special meaning in the dependent type theory). They can also include
+subscripts, which can be entered by typing <code>\_</code> followed
+by the desired subscripted character.
+</p>
+
+<p>
+Lean's parser is moreover extensible, which is to say, we can define
+new notation.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-15' mode="ace/mode/lean" readonly="true">notation `[` a `**` b `]` := a * b + 1
+
+def mul_square (a b : ℕ) := a * a * b * b
+
+infix `&lt;*&gt;`:50 := mul_square
+
+eval [2 ** 3]
+eval 2 &lt;*&gt; 3
+</juicy-ace-editor><div id='lean-full-code-15' style='display:none'>notation `[` a `**` b `]` := a * b + 1
+
+def mul_square (a b : ℕ) := a * a * b * b
+
+infix `&lt;*&gt;`:50 := mul_square
+
+eval [2 ** 3]
+eval 2 &lt;*&gt; 3
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-15').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+In this example, the <code>notation</code> command defines a complex binary
+notation for multiplying and adding one. The <code>infix</code> command declares
+a new infix operator, with precedence 50, which associates to the
+left. (More precisely, the token is given left-binding power 50.) The
+command <code>infixr</code> defines notation which associates to the right,
+instead.
+</p>
+
+<p>
+If you declare these notations in a namespace, the notation is only
+available when the namespace is open. You can declare temporary notation
+using the keyword <code>local</code>, in which case the notation is available
+in the current file, and moreover, within the scope of the current
+<code>namespace</code> or <code>section</code>, if you are in one.
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-16' mode="ace/mode/lean" readonly="true">local notation `[` a `**` b `]` := a * b + 1
+local infix `&lt;*&gt;`:50 := λ a b : ℕ, a * a * b * b</juicy-ace-editor><div id='lean-full-code-16' style='display:none'>local notation `[` a `**` b `]` := a * b + 1
+local infix `&lt;*&gt;`:50 := λ a b : ℕ, a * a * b * b
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-16').text());">Try it yourself &raquo;</button></div>
+</div>
+
+<p>
+The file <code>reserved_notation.lean</code> in the <code>init</code> folder of the library
+declares the left-binding powers of a number of common symbols that
+are used in the library.
+</p>
+<blockquote>
+<p>
+<a target='_blank' href="https://github.com/leanprover/lean/blob/master/library/init/reserved_notation.lean">https://github.com/leanprover/lean/blob/master/library/init/reserved_notation.lean</a>
+</p>
+</blockquote>
+<p>
+You are welcome to overload these symbols for your own use, but you
+cannot change their right-binding power.
+</p>
+
+<p>
+Remember that you can direct the pretty-printer to suppress notation
+with the command <code>set_option pp.notation false</code>. You can also declare
+notation to be used for input purposes only with the <code>[parsing_only]</code>
+attribute:
+</p>
+<div class="org-src-container">
+<juicy-ace-editor id='lean-juicy-ace-editor-17' mode="ace/mode/lean" readonly="true">notation [parsing_only] `[` a `**` b `]` := a * b + 1
+
+variables a b : ℕ
+check [a ** b]
+</juicy-ace-editor><div id='lean-full-code-17' style='display:none'>notation [parsing_only] `[` a `**` b `]` := a * b + 1
+
+variables a b : ℕ
+check [a ** b]
+</div><div class='no-print' align="left"><button type="button" onclick="invoke_leanjs($('#lean-full-code-17').text());">Try it yourself &raquo;</button></div>
+</div>
+<p>
+The output of the <code>check</code> command displays the expression as <code>a * b +
+1</code>. Lean also provides mechanisms for iterated notation, such as <code>[a,
+b, c, d, e]</code> to denote a list with the indicated elements. See the
+discussion of <code>list</code> in the next chapter for an example.
+</p>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
